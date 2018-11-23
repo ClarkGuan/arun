@@ -21,6 +21,7 @@ func main() {
 	cmakeBuildDir := filepath.Join(path, "cmake-build-"+mode)
 	if _, err := os.Stat(cmakeBuildDir); err != nil {
 		fmt.Fprintf(os.Stderr, "%s not found\n", cmakeBuildDir)
+		flag.PrintDefaults()
 		os.Exit(1)
 	}
 
@@ -28,6 +29,7 @@ func main() {
 	targets := make([][]byte, 0, 8)
 	if content, err := ioutil.ReadFile(cmakeBuildFile); err != nil {
 		fmt.Fprintf(os.Stderr, "%s open fail", cmakeBuildFile)
+		flag.PrintDefaults()
 		os.Exit(1)
 	} else {
 		regexExpr := regexp.MustCompile(`add_executable\s*\(\s*(\w+)\s+`)
@@ -38,6 +40,7 @@ func main() {
 	}
 	if len(targets) == 0 {
 		fmt.Fprintln(os.Stderr, "cannot find any add_executable target")
+		flag.PrintDefaults()
 		os.Exit(1)
 	}
 	//fmt.Println("find target(s) list below:")
@@ -59,6 +62,7 @@ func main() {
 	execFile, err := filepath.Abs(filepath.Join(cmakeBuildDir, string(targets[index])))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s not found\n", execFile)
+		flag.PrintDefaults()
 		os.Exit(1)
 	}
 	fmt.Printf("prepare to push %s to device\n", execFile)
