@@ -23,7 +23,7 @@ go get github.com/ClarkGuan/arun
 #### 使用
 
 ```bash
-arun -p <CLion 工程路径> -m <debug 或 release> <程序参数列表>
+arun -clion <CLion 工程路径> -m <debug 或 release> <程序参数列表>
 ```
 
 例如，在 CLion 工程目录下执行运行：
