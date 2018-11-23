@@ -44,7 +44,7 @@ arun
 arun x y z
 ```
 
-如果在其他目录则指定 CLion 的工程目录：
+如果`当前目录`（$PWD）不是 CLion 工程目录，则使用`-clion`选项指定：
 
 ```bash
 arun -clion ../hello_world_project x y z
