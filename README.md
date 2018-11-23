@@ -57,3 +57,7 @@ arun -m release
 ```
 
 这样，arun 工具会寻找 cmake-build-release 目录中的可执行文件。
+
+#### 名词解释
+
+* CLion 工程路径：包含 CMakeLists.txt 的 CLion 可识别的工程目录。编译产物目录目前只支持 cmake-build-* 的形式
