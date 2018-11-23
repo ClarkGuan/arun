@@ -13,11 +13,48 @@ import (
 func main() {
 	var mode string
 	var path string
+	var exefile string
 
 	flag.StringVar(&mode, "m", "debug", "debug, release or relwithdebinfo...")
 	flag.StringVar(&path, "clion", ".", "project path")
+	flag.StringVar(&exefile, "exe", "", "executable file path")
 	flag.Parse()
 
+	if len(exefile) == 0 {
+		runClionProject(mode, path)
+	} else {
+		runSigleExeFile(exefile)
+	}
+}
+
+func runSigleExeFile(exefile string) {
+	execFile, err := filepath.Abs(exefile)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%s not found\n", execFile)
+		flag.PrintDefaults()
+		os.Exit(1)
+	}
+
+	fmt.Printf("prepare to push %s to device\n", execFile)
+
+	if err := runCmd("adb", "push", execFile, "/data/local/tmp/"); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+
+	var args []string
+	args = append(args, "shell",
+		"echo \"[程序输出如下]\" && LD_LIBRARY_PATH=/data/local/tmp",
+		"/data/local/tmp/"+filepath.Base(execFile))
+	args = append(args, flag.Args()...)
+	args = append(args, "&& echo \"[程序执行完毕]\" || echo \"[程序执行返回$?]\"")
+	if err := runCmd("adb", args...); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+func runClionProject(mode, path string) {
 	cmakeBuildDir := filepath.Join(path, "cmake-build-"+mode)
 	if _, err := os.Stat(cmakeBuildDir); err != nil {
 		fmt.Fprintf(os.Stderr, "%s not found\n", cmakeBuildDir)
@@ -57,31 +94,7 @@ func main() {
 	//	os.Exit(1)
 	//}
 
-	index := 0
-
-	execFile, err := filepath.Abs(filepath.Join(cmakeBuildDir, string(targets[index])))
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "%s not found\n", execFile)
-		flag.PrintDefaults()
-		os.Exit(1)
-	}
-	fmt.Printf("prepare to push %s to device\n", execFile)
-
-	if err := runCmd("adb", "push", execFile, "/data/local/tmp/"); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-
-	var args []string
-	args = append(args, "shell",
-		"echo \"[程序输出如下]\" && LD_LIBRARY_PATH=/data/local/tmp",
-		"/data/local/tmp/"+filepath.Base(execFile))
-	args = append(args, flag.Args()...)
-	args = append(args, "&& echo \"[程序执行完毕]\" || echo \"[程序执行返回$?]\"")
-	if err := runCmd("adb", args...); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
+	runSigleExeFile(filepath.Join(cmakeBuildDir, string(targets[0])))
 }
 
 func runCmd(cmd string, args ...string) error {
