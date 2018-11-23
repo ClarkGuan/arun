@@ -41,7 +41,7 @@ arun x y z
 如果在其他目录则指定 CLion 的工程目录：
 
 ```bash
-arun -p ../hello_world_project x y z
+arun -clion ../hello_world_project x y z
 ```
 
 默认情况下，arun 识别 CLion 的 debug 编译产物，即 cmake-build-debug 目录，我们可以使用 `-m` 选项指定其他编译模式，例如

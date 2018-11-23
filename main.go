@@ -15,7 +15,7 @@ func main() {
 	var path string
 
 	flag.StringVar(&mode, "m", "debug", "debug, release or relwithdebinfo...")
-	flag.StringVar(&path, "p", ".", "project path")
+	flag.StringVar(&path, "clion", ".", "project path")
 	flag.Parse()
 
 	cmakeBuildDir := filepath.Join(path, "cmake-build-"+mode)
