@@ -14,16 +14,20 @@ func main() {
 	var mode string
 	var path string
 	var exefile string
+	var ddmobile string
 
 	flag.StringVar(&mode, "m", "debug", "debug, release or relwithdebinfo...")
 	flag.StringVar(&path, "clion", ".", "project path")
 	flag.StringVar(&exefile, "exe", "", "executable file path")
+	flag.StringVar(&ddmobile, "ddmobile", "", "ddmobile project path")
 	flag.Parse()
 
-	if len(exefile) == 0 {
-		runClionProject(mode, path)
-	} else {
+	if len(exefile) != 0 {
 		runSigleExeFile(exefile)
+	} else if len(ddmobile) != 0 {
+		runDdmobileProject(ddmobile)
+	} else {
+		runClionProject(mode, path)
 	}
 }
 
@@ -54,6 +58,49 @@ func runSigleExeFile(exefile string) {
 	}
 }
 
+func runDdmobileProject(path string) {
+	buildDir := filepath.Join(path, "build/android/app")
+	if infos, err := ioutil.ReadDir(buildDir); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	} else {
+		var files []string
+
+		for _, info := range infos {
+			if info.IsDir() {
+				files = append(files, info.Name())
+			}
+		}
+
+		if len(files) == 0 {
+			fmt.Fprintf(os.Stderr, "can't find any ddmobile build files in %s", buildDir)
+			os.Exit(1)
+		}
+
+		index := -1
+		for index == -1 {
+			for n, s := range files {
+				fmt.Printf("%d: %s\n", n, s)
+			}
+			fmt.Printf("please enter your choice: ")
+			fmt.Scanf("%d", &index)
+			if index >= len(files) {
+				fmt.Fprintf(os.Stderr, "index out of bounds")
+				index = -1
+			}
+		}
+
+		parentDir := filepath.Join(buildDir, files[index])
+		if infos, err = ioutil.ReadDir(parentDir); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		} else {
+			target := filepath.Join(parentDir, infos[0].Name())
+			runSigleExeFile(target)
+		}
+	}
+}
+
 func runClionProject(mode, path string) {
 	cmakeBuildDir := filepath.Join(path, "cmake-build-"+mode)
 	if _, err := os.Stat(cmakeBuildDir); err != nil {
@@ -80,19 +127,6 @@ func runClionProject(mode, path string) {
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
-	//fmt.Println("find target(s) list below:")
-	//for i, target := range targets {
-	//	fmt.Printf("%d: %s\n", i, target)
-	//}
-	//fmt.Printf("please enter index: ")
-	//
-	//var index int
-	//fmt.Scanf("%d", &index)
-	//
-	//if index >= len(targets) {
-	//	fmt.Fprintln(os.Stderr, "index enterd out of bands")
-	//	os.Exit(1)
-	//}
 
 	runSigleExeFile(filepath.Join(cmakeBuildDir, string(targets[0])))
 }

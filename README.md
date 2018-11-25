@@ -29,6 +29,12 @@ arun -clion <CLion 工程路径> -m <debug 或 release> <程序参数列表>
 或
 
 ```bash
+arun -ddmobile <ddmobile 工程路径> <程序参数列表>
+```
+
+或
+
+```bash
 arun -exe <可执行文件路径> <程序参数列表>
 ```
 
