@@ -24,11 +24,28 @@ func main() {
 
 	if len(exefile) != 0 {
 		runSigleExeFile(exefile)
-	} else if len(ddmobile) != 0 {
-		runDdmobileProject(ddmobile)
-	} else {
-		runClionProject(mode, path)
+		return
 	}
+
+	if len(path) > 0 || len(mode) > 0 {
+		runClionProject(mode, path)
+		return
+	}
+
+	if len(ddmobile) > 0 {
+		runDdmobileProject(ddmobile)
+		return
+	}
+
+	if _, err := os.Stat("build/android/app"); err == nil {
+		runDdmobileProject(".")
+	}
+
+	if _, err := os.Stat("cmake-build-debug"); err == nil {
+		runClionProject("debug", ".")
+	}
+
+	flag.PrintDefaults()
 }
 
 func runSigleExeFile(exefile string) {
