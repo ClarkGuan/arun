@@ -39,10 +39,12 @@ func main() {
 
 	if _, err := os.Stat("build/android/app"); err == nil {
 		runDdmobileProject(".")
+		return
 	}
 
 	if _, err := os.Stat("cmake-build-debug"); err == nil {
 		runClionProject("debug", ".")
+		return
 	}
 
 	flag.PrintDefaults()
