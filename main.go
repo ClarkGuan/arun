@@ -97,15 +97,20 @@ func runDdmobileProject(path string) {
 		}
 
 		index := -1
-		for index == -1 {
-			for n, s := range files {
-				fmt.Printf("%d: %s\n", n, s)
-			}
-			fmt.Printf("please enter your choice: ")
-			fmt.Scanf("%d", &index)
-			if index >= len(files) {
-				fmt.Fprintf(os.Stderr, "index out of bounds")
-				index = -1
+
+		if len(files) == 1 {
+			index = 0
+		} else {
+			for index == -1 {
+				for n, s := range files {
+					fmt.Printf("%d: %s\n", n, s)
+				}
+				fmt.Printf("please enter your choice: ")
+				fmt.Scanf("%d", &index)
+				if index >= len(files) {
+					fmt.Fprintf(os.Stderr, "index out of bounds")
+					index = -1
+				}
 			}
 		}
 
