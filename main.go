@@ -16,8 +16,8 @@ func main() {
 	var exefile string
 	var ddmobile string
 
-	flag.StringVar(&mode, "m", "debug", "debug, release or relwithdebinfo...")
-	flag.StringVar(&path, "clion", ".", "project path")
+	flag.StringVar(&mode, "m", "", "debug, release or relwithdebinfo...")
+	flag.StringVar(&path, "clion", "", "project path")
 	flag.StringVar(&exefile, "exe", "", "executable file path")
 	flag.StringVar(&ddmobile, "ddmobile", "", "ddmobile project path")
 	flag.Parse()
@@ -119,6 +119,9 @@ func runDdmobileProject(path string) {
 }
 
 func runClionProject(mode, path string) {
+	if len(mode) == 0 {
+		mode = "debug"
+	}
 	cmakeBuildDir := filepath.Join(path, "cmake-build-"+mode)
 	if _, err := os.Stat(cmakeBuildDir); err != nil {
 		fmt.Fprintf(os.Stderr, "%s not found\n", cmakeBuildDir)
