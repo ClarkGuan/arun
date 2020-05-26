@@ -70,7 +70,7 @@ func runSigleExeFile(exefile string) {
 		"echo \"[程序输出如下]\" && LD_LIBRARY_PATH=/data/local/tmp",
 		"/data/local/tmp/"+filepath.Base(execFile))
 	args = append(args, flag.Args()...)
-	args = append(args, "&& echo \"[程序执行完毕]\" || echo \"[程序执行返回$?]\"")
+	args = append(args, "&& echo \"[程序执行完毕]\" || echo \"[程序执行返回错误码($?)]\"")
 	if err := runCmd("adb", args...); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
