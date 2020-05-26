@@ -3,55 +3,41 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
+	"strings"
 )
 
 func main() {
-	var mode string
-	var path string
-	var exefile string
-	var ddmobile string
-
-	flag.StringVar(&mode, "m", "", "debug, release or relwithdebinfo...")
-	flag.StringVar(&path, "clion", "", "project path")
-	flag.StringVar(&exefile, "exe", "", "executable file path")
-	flag.StringVar(&ddmobile, "ddmobile", "", "ddmobile project path")
-	flag.Parse()
-
-	if len(exefile) != 0 {
-		runSigleExeFile(exefile)
-		return
+	if len(os.Args) < 2 {
+		fmt.Fprintln(os.Stderr, "缺少 可执行文件路径 这一必须参数")
+		os.Exit(1)
 	}
 
-	if len(path) > 0 || len(mode) > 0 {
-		runClionProject(mode, path)
-		return
+	targetFile := os.Args[1]
+	isTest := false
+	otherArgs := os.Args[2:]
+	switch os.Args[1] {
+	case "-exe", "exe":
+		if len(os.Args) < 3 {
+			fmt.Fprintln(os.Stderr, "缺少 可执行文件路径 这一必须参数")
+			os.Exit(1)
+		}
+		targetFile = os.Args[2]
+		otherArgs = os.Args[3:]
+
+	case "-test", "test":
+		if len(os.Args) < 3 {
+			fmt.Fprintln(os.Stderr, "缺少 可执行文件路径 这一必须参数")
+			os.Exit(1)
+		}
+		targetFile = os.Args[2]
+		isTest = true
+		otherArgs = os.Args[3:]
 	}
 
-	if len(ddmobile) > 0 {
-		runDdmobileProject(ddmobile)
-		return
-	}
-
-	if _, err := os.Stat("build/android/app"); err == nil {
-		runDdmobileProject(".")
-		return
-	}
-
-	if _, err := os.Stat("cmake-build-debug"); err == nil {
-		runClionProject("debug", ".")
-		return
-	}
-
-	flag.PrintDefaults()
-}
-
-func runSigleExeFile(exefile string) {
-	execFile, err := filepath.Abs(exefile)
+	execFile, err := filepath.Abs(targetFile)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s not found\n", execFile)
 		flag.PrintDefaults()
@@ -69,93 +55,24 @@ func runSigleExeFile(exefile string) {
 	args = append(args, "shell",
 		"echo \"[程序输出如下]\" && LD_LIBRARY_PATH=/data/local/tmp",
 		"/data/local/tmp/"+filepath.Base(execFile))
-	args = append(args, flag.Args()...)
+	if isTest {
+		found := false
+		for _, arg := range otherArgs {
+			if strings.HasPrefix(arg, "-test.v") {
+				found = true
+				break
+			}
+		}
+		if !found {
+			args = append(args, "-test.v=true")
+		}
+	}
+	args = append(args, otherArgs...)
 	args = append(args, "&& echo \"[程序执行完毕]\" || echo \"[程序执行返回错误码($?)]\"")
 	if err := runCmd("adb", args...); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-}
-
-func runDdmobileProject(path string) {
-	buildDir := filepath.Join(path, "build/android/app")
-	if infos, err := ioutil.ReadDir(buildDir); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	} else {
-		var files []string
-
-		for _, info := range infos {
-			if info.IsDir() {
-				files = append(files, info.Name())
-			}
-		}
-
-		if len(files) == 0 {
-			fmt.Fprintf(os.Stderr, "can't find any ddmobile build files in %s", buildDir)
-			os.Exit(1)
-		}
-
-		index := -1
-
-		if len(files) == 1 {
-			index = 0
-		} else {
-			for index == -1 {
-				for n, s := range files {
-					fmt.Printf("%d: %s\n", n, s)
-				}
-				fmt.Printf("please enter your choice: ")
-				fmt.Scanf("%d", &index)
-				if index >= len(files) {
-					fmt.Fprintf(os.Stderr, "index out of bounds")
-					index = -1
-				}
-			}
-		}
-
-		parentDir := filepath.Join(buildDir, files[index])
-		if infos, err = ioutil.ReadDir(parentDir); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		} else {
-			target := filepath.Join(parentDir, infos[0].Name())
-			runSigleExeFile(target)
-		}
-	}
-}
-
-func runClionProject(mode, path string) {
-	if len(mode) == 0 {
-		mode = "debug"
-	}
-	cmakeBuildDir := filepath.Join(path, "cmake-build-"+mode)
-	if _, err := os.Stat(cmakeBuildDir); err != nil {
-		fmt.Fprintf(os.Stderr, "%s not found\n", cmakeBuildDir)
-		flag.PrintDefaults()
-		os.Exit(1)
-	}
-
-	cmakeBuildFile := filepath.Join(path, "CMakeLists.txt")
-	targets := make([][]byte, 0, 8)
-	if content, err := ioutil.ReadFile(cmakeBuildFile); err != nil {
-		fmt.Fprintf(os.Stderr, "%s open fail", cmakeBuildFile)
-		flag.PrintDefaults()
-		os.Exit(1)
-	} else {
-		regexExpr := regexp.MustCompile(`add_executable\s*\(\s*(\w+)\s+`)
-		groups := regexExpr.FindSubmatch(content)
-		if len(groups) > 1 {
-			targets = append(targets, groups[1:]...)
-		}
-	}
-	if len(targets) == 0 {
-		fmt.Fprintln(os.Stderr, "cannot find any add_executable target")
-		flag.PrintDefaults()
-		os.Exit(1)
-	}
-
-	runSigleExeFile(filepath.Join(cmakeBuildDir, string(targets[0])))
 }
 
 func runCmd(cmd string, args ...string) error {
