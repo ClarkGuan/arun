@@ -1,6 +1,6 @@
 # arun
 
-辅助 CLion 运行 Android 上可执行的 C/C++ 程序。
+辅助运行 Android 上可执行程序。
 
 #### 初衷
 
@@ -17,53 +17,27 @@
 #### 安装
 
 ```bash
-go get github.com/ClarkGuan/arun
+GO111MODULE=off go get github.com/ClarkGuan/arun
+```
+
+或
+
+```bash
+git clone https://github.com/ClarkGuan/arun
+cd arun
+go install
 ```
 
 #### 使用
 
 ```bash
-arun -clion <CLion 工程路径> -m <debug 或 release> <程序参数列表>
+arun [-exe|exe] <可执行文件路径> <程序参数列表>
 ```
 
-或
+另外也增加了对于 Golang 编译的单元测试二进制文件的支持：
 
 ```bash
-arun -ddmobile <ddmobile 工程路径> <程序参数列表>
+arun [-test|test] <Go单元测试可执行文件路径> <程序参数列表>
 ```
 
-或
-
-```bash
-arun -exe <可执行文件路径> <程序参数列表>
-```
-
-例如，在 CLion 工程目录下执行运行：
-
-```bash
-arun
-```
-
-或传递参数 x, y, z：
-
-```bash
-arun x y z
-```
-
-如果`当前目录`（$PWD）不是 CLion 工程目录，则使用`-clion`选项指定：
-
-```bash
-arun -clion ../hello_world_project x y z
-```
-
-默认情况下，arun 识别 CLion 的 debug 编译产物，即 cmake-build-debug 目录，我们可以使用 `-m` 选项指定其他编译模式，例如
-
-```bash
-arun -m release
-```
-
-这样，arun 工具会寻找 cmake-build-release 目录中的可执行文件。
-
-#### 名词解释
-
-* CLion 工程路径：包含 CMakeLists.txt 的 CLion 可识别的工程目录。编译产物目录目前只支持 cmake-build-* 的形式
+具体可以参考我编写的另一个工具 —— ddmobile（https://github.com/ClarkGuan/ddmobile）。
