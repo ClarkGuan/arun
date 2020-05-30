@@ -69,6 +69,7 @@ func main() {
 	}
 	args = append(args, otherArgs...)
 	args = append(args, "&& echo \"[程序执行完毕]\" || echo \"[程序执行返回错误码($?)]\"")
+	args = append(args, "&& rm "+"/data/local/tmp/"+filepath.Base(execFile))
 	if err := runCmd("adb", args...); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
