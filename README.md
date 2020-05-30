@@ -34,10 +34,3 @@ go install
 arun [-exe|exe] <可执行文件路径> <程序参数列表>
 ```
 
-另外也增加了对于 Golang 编译的单元测试二进制文件的支持：
-
-```bash
-arun (-test|test) <Go单元测试可执行文件路径> <程序参数列表>
-```
-
-具体可以参考我编写的另一个工具 —— ddmobile（https://github.com/ClarkGuan/ddmobile）。
