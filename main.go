@@ -53,7 +53,7 @@ func main() {
 
 	var args []string
 	args = append(args, "shell",
-		"echo \"[程序输出如下]\" && LD_LIBRARY_PATH=/data/local/tmp",
+		"echo \"[程序输出如下]\" && LD_LIBRARY_PATH=/data/local/tmp", "time",
 		"/data/local/tmp/"+filepath.Base(execFile))
 	if isTest {
 		found := false
