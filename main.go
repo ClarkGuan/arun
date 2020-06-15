@@ -52,12 +52,13 @@ func main() {
 	}
 
 	var args []string
+	execFile = "/data/local/tmp/" + filepath.Base(execFile)
 	args = append(args, "shell",
 		"echo \"[程序输出如下]\" &&",
 		"time",
 		"sh", "-c",
 		"'",
-		"LD_LIBRARY_PATH=/data/local/tmp /data/local/tmp/"+filepath.Base(execFile))
+		"LD_LIBRARY_PATH=/data/local/tmp", execFile)
 	if isTest {
 		found := false
 		for _, arg := range otherArgs {
@@ -73,7 +74,7 @@ func main() {
 	args = append(args, otherArgs...)
 	args = append(args, "&& echo \"[程序执行完毕]\" || echo \"[程序执行返回错误码($?)]\"",
 		"'",
-		"&& rm "+"/data/local/tmp/"+filepath.Base(execFile))
+		"&& rm", execFile)
 	if err := runCmd("adb", args...); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
