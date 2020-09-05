@@ -114,13 +114,15 @@ func runGoTest(target string, oArgs []string) error {
 		return err
 	}
 	var args []string
+	fileTargetPath := "/data/local/tmp/" + filepath.Base(execFile)
 	args = append(args, "shell",
-		"echo \"[程序输出如下]\" &&",
+		"chmod +x", fileTargetPath,
+		"&& echo \"[程序输出如下]\" &&",
 		"time",
 		"sh", "-c",
 		"'",
 		"LD_LIBRARY_PATH=/data/local/tmp",
-		"/data/local/tmp/"+filepath.Base(execFile))
+		fileTargetPath)
 
 	found := false
 	for _, arg := range args {
@@ -136,7 +138,7 @@ func runGoTest(target string, oArgs []string) error {
 	args = append(args, oArgs...)
 	args = append(args, "&& echo \"[程序执行完毕]\" || echo \"[程序执行返回错误码($?)]\"",
 		"'",
-		"&& rm "+fmt.Sprintf("\"/data/local/tmp/%s\"", filepath.Base(execFile)))
+		"&& rm "+fmt.Sprintf("\"%s\"", fileTargetPath))
 	err = runCmd("adb", args...)
 	return err
 }
