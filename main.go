@@ -85,7 +85,8 @@ func runExec(target string, oArgs []string) error {
 	var args []string
 	fileTargetPath := "/data/local/tmp/" + filepath.Base(execFile)
 	args = append(args, "shell",
-		"chmod +x", fileTargetPath,
+		"cd /data/local/tmp/",
+		"&& chmod +x", fileTargetPath,
 		"&& echo \"[程序输出如下]\" &&",
 		"time",
 		"sh", "-c",
@@ -116,7 +117,8 @@ func runGoTest(target string, oArgs []string) error {
 	var args []string
 	fileTargetPath := "/data/local/tmp/" + filepath.Base(execFile)
 	args = append(args, "shell",
-		"chmod +x", fileTargetPath,
+		"cd /data/local/tmp/",
+		"&& chmod +x", fileTargetPath,
 		"&& echo \"[程序输出如下]\" &&",
 		"time",
 		"sh", "-c",
@@ -154,7 +156,8 @@ func runDexJar(target string, oArgs []string) error {
 	}
 	var args []string
 	args = append(args, "shell",
-		"echo \"[程序输出如下]\" &&",
+		"cd /data/local/tmp/",
+		"&& echo \"[程序输出如下]\" &&",
 		"time",
 		"sh", "-c",
 		"'",
