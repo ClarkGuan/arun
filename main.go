@@ -4,10 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 )
 
 var (
@@ -15,149 +15,133 @@ var (
 )
 
 func main() {
+	var adb string
+	var err error
+
+	if adb, err = findAdb(); err != nil {
+		printlnSilent(os.Stderr, "adb or adb.exe not found")
+		os.Exit(1)
+	}
+
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "缺少 可执行文件路径 这一必须参数")
+		printlnSilent(os.Stderr, "executable or zip path not found")
 		os.Exit(1)
 	}
 
 	targetFile := os.Args[1]
 	otherArgs := os.Args[2:]
-	var err error
-	switch os.Args[1] {
-	case "-exe", "exe":
-		if len(os.Args) < 3 {
-			fmt.Fprintln(os.Stderr, "缺少 可执行文件路径 这一必须参数")
+
+	if isZip(targetFile) {
+		if len(otherArgs) == 0 {
+			printlnSilent(os.Stderr, "main class name not found")
 			os.Exit(1)
 		}
-		targetFile = os.Args[2]
-		otherArgs = os.Args[3:]
-		err = runExec(targetFile, otherArgs)
-
-	case "-gotest", "gotest":
-		if len(os.Args) < 3 {
-			fmt.Fprintln(os.Stderr, "缺少 可执行文件路径 这一必须参数")
-			os.Exit(1)
-		}
-		targetFile = os.Args[2]
-		otherArgs = os.Args[3:]
-		err = runGoTest(targetFile, otherArgs)
-
-	case "-jar", "jar":
-		if len(os.Args) < 4 {
-			fmt.Fprintln(os.Stderr, "缺少 jar包 & 主类名 等必须参数")
-			os.Exit(1)
-		}
-		targetFile = os.Args[2]
-		otherArgs = os.Args[3:]
-		err = runDexJar(targetFile, otherArgs)
-
-	default:
-		if isZip(targetFile) {
-			if len(otherArgs) == 0 {
-				fmt.Fprintln(os.Stderr, "缺少 主类名 这一必须参数")
-				os.Exit(1)
-			}
-			err = runDexJar(targetFile, otherArgs)
-		} else {
-			err = runExec(targetFile, otherArgs)
-		}
+		err = runDexJar(adb, targetFile, otherArgs)
+	} else {
+		extras, otherArgs := findExtraFiles(otherArgs)
+		err = runExec(adb, targetFile, extras, otherArgs)
 	}
 
+	exit(err)
+}
+
+func findAdb() (string, error) {
+	return exec.LookPath("adb")
+}
+
+func exit(err error) {
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 }
 
-func runExec(target string, oArgs []string) error {
-	if !isELF(target) {
-		return errNotELF
+func printlnSilent(w io.Writer, a ...interface{}) {
+	if _, err := fmt.Fprintln(w, a...); err != nil {
+		exit(err)
 	}
-
-	execFile, err := filepath.Abs(target)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("prepare to push %s to device\n", execFile)
-	if err := runCmd("adb", "push", execFile, "/data/local/tmp/"); err != nil {
-		return err
-	}
-	var args []string
-	fileTargetPath := "/data/local/tmp/" + filepath.Base(execFile)
-	args = append(args, "shell",
-		"cd /data/local/tmp/",
-		"&& chmod +x", fileTargetPath,
-		"&& echo \"[程序输出如下]\" &&",
-		"time",
-		"sh", "-c",
-		"'",
-		"LD_LIBRARY_PATH=/data/local/tmp",
-		fileTargetPath)
-	args = append(args, oArgs...)
-	args = append(args, "&& echo \"[程序执行完毕]\" || echo \"[程序执行返回错误码($?)]\"",
-		"'",
-		"&& rm "+fmt.Sprintf("\"%s\"", fileTargetPath))
-	err = runCmd("adb", args...)
-	return err
 }
 
-func runGoTest(target string, oArgs []string) error {
-	if !isELF(target) {
-		return errNotELF
+func closeSilent(f *os.File) {
+	if err := f.Close(); err != nil {
+		exit(err)
+	}
+}
+
+func findExtraFiles(args []string) ([]string, []string) {
+	max := len(args)
+	if max == 0 {
+		return nil, args
 	}
 
-	execFile, err := filepath.Abs(target)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("prepare to push %s to device\n", execFile)
-	if err := runCmd("adb", "push", execFile, "/data/local/tmp/"); err != nil {
-		return err
-	}
-	var args []string
-	fileTargetPath := "/data/local/tmp/" + filepath.Base(execFile)
-	args = append(args, "shell",
-		"cd /data/local/tmp/",
-		"&& chmod +x", fileTargetPath,
-		"&& echo \"[程序输出如下]\" &&",
-		"time",
-		"sh", "-c",
-		"'",
-		"LD_LIBRARY_PATH=/data/local/tmp",
-		fileTargetPath)
+	var ret []string
+	index := 0
 
-	found := false
-	for _, arg := range args {
-		if strings.HasPrefix(arg, "-test.v") {
-			found = true
+	for ; index < max; index++ {
+		if info, err := os.Stat(args[index]); err == nil && (info.Mode()&fs.ModeType) == 0 {
+			ret = append(ret, args[index])
+		} else {
 			break
 		}
 	}
-	if !found {
-		args = append(args, "-test.v=true")
-	}
 
-	args = append(args, oArgs...)
-	args = append(args, "&& echo \"[程序执行完毕]\" || echo \"[程序执行返回错误码($?)]\"",
-		"'",
-		"&& rm "+fmt.Sprintf("\"%s\"", fileTargetPath))
-	err = runCmd("adb", args...)
-	return err
+	return ret, args[index:]
 }
 
-func runDexJar(target string, oArgs []string) error {
+func runExec(adb string, target string, extraFiles []string, oArgs []string) error {
+	if !isELF(target) {
+		return errNotELF
+	}
+
+	// adb push ...
+	totalFiles := []string{target}
+	totalFiles = append(totalFiles, extraFiles...)
+
+	for _, f := range totalFiles {
+		execFile, err := filepath.Abs(f)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("prepare to push %s to device\n", execFile)
+		if err := runCmd(adb, "push", execFile, "/data/local/tmp/"); err != nil {
+			return err
+		}
+	}
+
+	var args []string
+	fileTargetPath := "/data/local/tmp/" + filepath.Base(target)
+	args = append(args, "shell",
+		"cd /data/local/tmp/",
+		"&& chmod +x", fileTargetPath,
+		"&& echo \"[程序输出如下]\" &&",
+		"time",
+		"sh", "-c",
+		"'",
+		"LD_LIBRARY_PATH=/data/local/tmp",
+		fileTargetPath)
+	args = append(args, oArgs...)
+	args = append(args, "&& echo \"[程序执行完毕]\" || echo \"[程序执行返回错误码($?)]\"", "'")
+
+	for _, f := range totalFiles {
+		args = append(args, fmt.Sprintf("&& rm /data/local/tmp/%s", filepath.Base(f)))
+	}
+
+	return runCmd(adb, args...)
+}
+
+func runDexJar(adb string, target string, oArgs []string) error {
 	execFile, err := filepath.Abs(target)
 	if err != nil {
 		return err
 	}
 	fmt.Printf("prepare to push %s to device\n", execFile)
-	if err := runCmd("adb", "push", execFile, "/data/local/tmp/"); err != nil {
+	if err := runCmd(adb, "push", execFile, "/data/local/tmp/"); err != nil {
 		return err
 	}
 	var args []string
 	args = append(args, "shell",
 		"cd /data/local/tmp/",
-		"&& echo \"[程序输出如下]\" &&",
+		"&& echo \"[program output]\" &&",
 		"time",
 		"sh", "-c",
 		"'",
@@ -166,10 +150,10 @@ func runDexJar(target string, oArgs []string) error {
 		"app_process",
 		"/")
 	args = append(args, oArgs...)
-	args = append(args, "&& echo \"[程序执行完毕]\" || echo \"[程序执行返回错误码($?)]\"",
+	args = append(args, "&& echo \"[program execution completed]\" || echo \"[error code returned: ($?)]\"",
 		"'",
 		"&& rm "+fmt.Sprintf("\"/data/local/tmp/%s\"", filepath.Base(execFile)))
-	err = runCmd("adb", args...)
+	err = runCmd(adb, args...)
 	return err
 }
 
@@ -187,7 +171,7 @@ func isZip(file string) bool {
 	if err != nil {
 		return false
 	}
-	defer f.Close()
+	defer closeSilent(f)
 	_, err = io.ReadFull(f, buf)
 	if err != nil {
 		return false
@@ -201,7 +185,7 @@ func isELF(file string) bool {
 	if err != nil {
 		return false
 	}
-	defer f.Close()
+	defer closeSilent(f)
 	_, err = io.ReadFull(f, buf)
 	if err != nil {
 		return false

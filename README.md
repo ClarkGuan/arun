@@ -19,21 +19,25 @@
 #### 安装
 
 ```bash
-GO111MODULE=off go get github.com/ClarkGuan/arun
+go install github.com/ClarkGuan/arun@latest
 ```
 
 或
 
 ```bash
-git clone https://github.com/ClarkGuan/arun
-cd arun
-go install
+git clone https://github.com/ClarkGuan/arun && cd arun && go install
 ```
 
 #### 使用
 
 ```bash
 $ arun <可执行文件> <程序参数列表>
+```
+
+或
+
+```bash
+$ arun <可执行文件> <动态库文件列表> <程序参数列表>
 ```
 
 或
