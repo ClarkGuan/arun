@@ -113,14 +113,14 @@ func runExec(adb string, target string, extraFiles []string, oArgs []string) err
 	args = append(args, "shell",
 		"cd /data/local/tmp/",
 		"&& chmod +x", fileTargetPath,
-		"&& echo \"[程序输出如下]\" &&",
+		"&& echo \"[program output]\" &&",
 		"time",
 		"sh", "-c",
 		"'",
 		"LD_LIBRARY_PATH=/data/local/tmp",
 		fileTargetPath)
 	args = append(args, oArgs...)
-	args = append(args, "&& echo \"[程序执行完毕]\" || echo \"[程序执行返回错误码($?)]\"", "'")
+	args = append(args, "&& echo \"[program execution completed]\" || echo \"[error code returned: ($?)]\"", "'")
 
 	for _, f := range totalFiles {
 		args = append(args, fmt.Sprintf("&& rm /data/local/tmp/%s", filepath.Base(f)))
