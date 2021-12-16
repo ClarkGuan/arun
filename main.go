@@ -37,7 +37,7 @@ func main() {
 	v := strings.ToLower(strings.TrimSpace(os.Getenv(ARunVerbose)))
 	verbose = verbose || v == "1" || v == "true"
 
-	if len(flag.Args()) < 2 {
+	if len(flag.Args()) < 1 {
 		printlnSilent(os.Stderr, "executable or zip path not found")
 		os.Exit(1)
 	}
@@ -119,7 +119,9 @@ func (runnable *Runnable) SetExtras(extras []string) *Runnable {
 
 func (runnable *Runnable) SetType(t RunnableType) *Runnable {
 	switch t {
-	case EXEC | DEX:
+	case EXEC:
+		fallthrough
+	case DEX:
 		runnable.typo = t
 	default:
 		runnable.typo = UNKNOWN
