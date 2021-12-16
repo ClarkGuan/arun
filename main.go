@@ -2,17 +2,22 @@ package main
 
 import (
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 )
 
 var (
-	errNotELF = errors.New("target is not an ELF file")
+	errNotELFOrDex = errors.New("target is not an ELF of DEX file")
+	errNoMainClass = errors.New("no main class found")
 )
+
+const AdbExtraCopy = "ADB_EXTRA_COPY"
 
 func main() {
 	var adb string
@@ -23,26 +28,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	if len(os.Args) < 2 {
+	var verbose bool
+	flag.BoolVar(&verbose, "v", false, "verbose output")
+	flag.Parse()
+
+	if len(flag.Args()) < 2 {
 		printlnSilent(os.Stderr, "executable or zip path not found")
 		os.Exit(1)
 	}
 
-	targetFile := os.Args[1]
-	otherArgs := os.Args[2:]
-
-	if isZip(targetFile) {
-		if len(otherArgs) == 0 {
-			printlnSilent(os.Stderr, "main class name not found")
-			os.Exit(1)
-		}
-		err = runDexJar(adb, targetFile, otherArgs)
-	} else {
-		extras, otherArgs := findExtraFiles(otherArgs)
-		err = runExec(adb, targetFile, extras, otherArgs)
-	}
-
-	exit(err)
+	targetFile := flag.Arg(0)
+	otherArgs := flag.Args()[1:]
+	exit(NewRunnable().SetVerbose(verbose).SetExtras(findExtraFiles()).Run(adb, targetFile, otherArgs))
 }
 
 func findAdb() (string, error) {
@@ -68,44 +65,96 @@ func closeSilent(f *os.File) {
 	}
 }
 
-func findExtraFiles(args []string) ([]string, []string) {
-	max := len(args)
-	if max == 0 {
-		return nil, args
-	}
-
-	var ret []string
-	index := 0
-
-	for ; index < max; index++ {
-		if info, err := os.Stat(args[index]); err == nil && (info.Mode()&fs.ModeType) == 0 {
-			ret = append(ret, args[index])
-		} else {
-			break
-		}
-	}
-
-	return ret, args[index:]
+func regularFileExist(s string) bool {
+	info, err := os.Stat(s)
+	return err == nil && info.Mode()&fs.ModeType == 0
 }
 
-func runExec(adb string, target string, extraFiles []string, oArgs []string) error {
-	if !isELF(target) {
-		return errNotELF
+func findExtraFiles() []string {
+	val, found := os.LookupEnv(AdbExtraCopy)
+	if !found {
+		return nil
+	}
+	val = strings.TrimSpace(val)
+	if len(val) == 0 {
+		return nil
+	}
+	vars := strings.Split(val, ":")
+	var ret []string
+	for _, s := range vars {
+		if regularFileExist(s) {
+			ret = append(ret, s)
+		}
+	}
+	return ret
+}
+
+type RunnableType int
+
+const (
+	EXEC RunnableType = iota
+	DEX
+)
+
+type Runnable struct {
+	typo    RunnableType
+	extras  []string
+	verbose bool
+}
+
+func NewRunnable() *Runnable {
+	return &Runnable{typo: EXEC}
+}
+
+func (runnable *Runnable) SetExtras(extras []string) *Runnable {
+	runnable.extras = extras
+	return runnable
+}
+
+func (runnable *Runnable) SetType(t RunnableType) *Runnable {
+	switch t {
+	case DEX:
+		runnable.typo = t
+	default:
+		runnable.typo = EXEC
+	}
+	return runnable
+}
+
+func (runnable *Runnable) SetVerbose(b bool) *Runnable {
+	runnable.verbose = b
+	return runnable
+}
+
+func (runnable *Runnable) Run(adb, target string, oArgs []string) error {
+	if isELF(target) {
+		runnable.SetType(EXEC)
+	} else if isZip(target) {
+		runnable.SetType(DEX)
+
+		if len(oArgs) < 1 {
+			return errNoMainClass
+		}
+	} else {
+		return errNotELFOrDex
 	}
 
-	// adb push ...
-	totalFiles := []string{target}
-	totalFiles = append(totalFiles, extraFiles...)
+	totalPushFiles := []string{target}
+	totalPushFiles = append(totalPushFiles, runnable.extras...)
+	var needRemoveFiles []string
 
-	for _, f := range totalFiles {
-		execFile, err := filepath.Abs(f)
+	for _, path := range totalPushFiles {
+		absPath, err := filepath.Abs(path)
 		if err != nil {
 			return err
 		}
-		fmt.Printf("prepare to push %s to device\n", execFile)
-		if err := runCmd(adb, "push", execFile, "/data/local/tmp/"); err != nil {
+		if runnable.verbose {
+			fmt.Printf("prepare to push %s to device\n", absPath)
+		}
+		if err = runCmd(adb, "push", absPath, "/data/local/tmp/"); err != nil {
 			return err
 		}
+		needRemoveFiles = append(needRemoveFiles, fmt.Sprintf("/data/local/tmp/%s", filepath.Base(absPath)))
 	}
 
 	var args []string
@@ -117,44 +166,28 @@ func runExec(adb string, target string, extraFiles []string, oArgs []string) err
 		"time",
 		"sh", "-c",
 		"'",
-		"LD_LIBRARY_PATH=/data/local/tmp",
-		fileTargetPath)
+		"LD_LIBRARY_PATH=/data/local/tmp")
+
+	switch runnable.typo {
+	case EXEC:
+		args = append(args, fileTargetPath)
+
+	case DEX:
+		args = append(args, fmt.Sprintf("CLASSPATH=\"%s\"", fileTargetPath),
+			"app_process", "/")
+
+	default:
+		panic("never reach here")
+	}
+
 	args = append(args, oArgs...)
 	args = append(args, "&& echo \"[program execution completed]\" || echo \"[error code returned: ($?)]\"", "'")
 
-	for _, f := range totalFiles {
-		args = append(args, fmt.Sprintf("&& rm /data/local/tmp/%s", filepath.Base(f)))
+	for _, path := range needRemoveFiles {
+		args = append(args, path)
 	}
 
 	return runCmd(adb, args...)
-}
-
-func runDexJar(adb string, target string, oArgs []string) error {
-	execFile, err := filepath.Abs(target)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("prepare to push %s to device\n", execFile)
-	if err := runCmd(adb, "push", execFile, "/data/local/tmp/"); err != nil {
-		return err
-	}
-	var args []string
-	args = append(args, "shell",
-		"cd /data/local/tmp/",
-		"&& echo \"[program output]\" &&",
-		"time",
-		"sh", "-c",
-		"'",
-		"LD_LIBRARY_PATH=/data/local/tmp",
-		fmt.Sprintf("CLASSPATH=\"/data/local/tmp/%s\"", filepath.Base(execFile)),
-		"app_process",
-		"/")
-	args = append(args, oArgs...)
-	args = append(args, "&& echo \"[program execution completed]\" || echo \"[error code returned: ($?)]\"",
-		"'",
-		"&& rm "+fmt.Sprintf("\"/data/local/tmp/%s\"", filepath.Base(execFile)))
-	err = runCmd(adb, args...)
-	return err
 }
 
 func runCmd(cmd string, args ...string) error {
