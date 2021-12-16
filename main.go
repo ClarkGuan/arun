@@ -92,7 +92,8 @@ func findExtraFiles() []string {
 type RunnableType int
 
 const (
-	EXEC RunnableType = iota
+	UNKNOWN RunnableType = iota
+	EXEC
 	DEX
 )
 
@@ -103,7 +104,7 @@ type Runnable struct {
 }
 
 func NewRunnable() *Runnable {
-	return &Runnable{typo: EXEC}
+	return &Runnable{typo: UNKNOWN}
 }
 
 func (runnable *Runnable) SetExtras(extras []string) *Runnable {
@@ -113,12 +114,26 @@ func (runnable *Runnable) SetExtras(extras []string) *Runnable {
 
 func (runnable *Runnable) SetType(t RunnableType) *Runnable {
 	switch t {
-	case DEX:
+	case EXEC | DEX:
 		runnable.typo = t
 	default:
-		runnable.typo = EXEC
+		runnable.typo = UNKNOWN
 	}
 	return runnable
+}
+
+func (runnable *Runnable) makeTypeExist(target string) error {
+	if runnable.typo < EXEC || runnable.typo > DEX {
+		if isELF(target) {
+			runnable.SetType(EXEC)
+		} else if isZip(target) {
+			runnable.SetType(DEX)
+		} else {
+			return errNotELFOrDex
+		}
+	}
+
+	return nil
 }
 
 func (runnable *Runnable) SetVerbose(b bool) *Runnable {
@@ -127,16 +142,12 @@ func (runnable *Runnable) SetVerbose(b bool) *Runnable {
 }
 
 func (runnable *Runnable) Run(adb, target string, oArgs []string) error {
-	if isELF(target) {
-		runnable.SetType(EXEC)
-	} else if isZip(target) {
-		runnable.SetType(DEX)
+	if err := runnable.makeTypeExist(target); err != nil {
+		return err
+	}
 
-		if len(oArgs) < 1 {
-			return errNoMainClass
-		}
-	} else {
-		return errNotELFOrDex
+	if runnable.typo == DEX && len(oArgs) == 0 {
+		return errNoMainClass
 	}
 
 	totalPushFiles := []string{target}
