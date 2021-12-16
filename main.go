@@ -195,7 +195,7 @@ func (runnable *Runnable) Run(adb, target string, oArgs []string) error {
 	args = append(args, "&& echo \"[program execution completed]\" || echo \"[error code returned: ($?)]\"", "'")
 
 	for _, path := range needRemoveFiles {
-		args = append(args, path)
+		args = append(args, fmt.Sprintf("&& rm \"%s\"", path))
 	}
 
 	return runCmd(adb, args...)
