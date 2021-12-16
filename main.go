@@ -17,7 +17,8 @@ var (
 	errNoMainClass = errors.New("no main class found")
 )
 
-const AdbExtraCopy = "ADB_EXTRA_COPY"
+const ARunCopy = "ARUN_COPY"
+const ARunVerbose = "ARUN_VERBOSE"
 
 func main() {
 	var adb string
@@ -30,7 +31,11 @@ func main() {
 
 	var verbose bool
 	flag.BoolVar(&verbose, "v", false, "verbose output")
+
 	flag.Parse()
+
+	v := strings.ToLower(strings.TrimSpace(os.Getenv(ARunVerbose)))
+	verbose = verbose || v == "1" || v == "true"
 
 	if len(flag.Args()) < 2 {
 		printlnSilent(os.Stderr, "executable or zip path not found")
@@ -71,7 +76,7 @@ func regularFileExist(s string) bool {
 }
 
 func findExtraFiles() []string {
-	val, found := os.LookupEnv(AdbExtraCopy)
+	val, found := os.LookupEnv(ARunCopy)
 	if !found {
 		return nil
 	}
