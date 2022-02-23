@@ -169,7 +169,7 @@ func (runnable *Runnable) Run(adb, target string, oArgs []string) error {
 		if runnable.verbose {
 			fmt.Printf("prepare to push %s to device\n", absPath)
 		}
-		if err = runCmd(adb, "push", absPath, "/data/local/tmp/"); err != nil {
+		if err = runCmd(adb, !runnable.verbose, "push", absPath, "/data/local/tmp/"); err != nil {
 			return err
 		}
 		needRemoveFiles = append(needRemoveFiles, fmt.Sprintf("/data/local/tmp/%s", filepath.Base(absPath)))
@@ -180,7 +180,7 @@ func (runnable *Runnable) Run(adb, target string, oArgs []string) error {
 	args = append(args, "shell",
 		"cd /data/local/tmp/",
 		"&& chmod +x", fileTargetPath,
-		"&& echo \"[program output]\" &&",
+		"&&",
 		"time",
 		"sh", "-c",
 		"'",
@@ -199,25 +199,30 @@ func (runnable *Runnable) Run(adb, target string, oArgs []string) error {
 	}
 
 	args = append(args, oArgs...)
-	args = append(args, "&& echo \"[program execution completed]\" || echo \"[error code returned: ($?)]\"", "'")
+	args = append(args, "&& echo \"============================\n[exit status:($?)]\"", "'")
 
 	for _, path := range needRemoveFiles {
 		args = append(args, fmt.Sprintf("&& rm \"%s\"", path))
 	}
 
-	return runCmd(adb, args...)
+	return runCmd(adb, false, args...)
 }
 
-func runCmd(cmd string, args ...string) error {
+func runCmd(cmd string, hide bool, args ...string) error {
 	command := exec.Command(cmd, args...)
 	command.Stderr = os.Stderr
-	command.Stdout = os.Stdout
+	if hide {
+		command.Stdout = nil
+	} else {
+		command.Stdout = os.Stdout
+	}
 	command.Stdin = os.Stdin
 	return command.Run()
 }
 
 func isZip(file string) bool {
-	buf := make([]byte, 2)
+	bufArray := [2]byte{0}
+	buf := bufArray[:]
 	f, err := os.Open(file)
 	if err != nil {
 		return false
@@ -231,7 +236,8 @@ func isZip(file string) bool {
 }
 
 func isELF(file string) bool {
-	buf := make([]byte, 4)
+	bufArray := [4]byte{0}
+	buf := bufArray[:]
 	f, err := os.Open(file)
 	if err != nil {
 		return false
