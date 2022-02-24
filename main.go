@@ -199,7 +199,7 @@ func (runnable *Runnable) Run(adb, target string, oArgs []string) error {
 	}
 
 	args = append(args, oArgs...)
-	args = append(args, "&& echo \"============================\n[exit status:($?)]\"", "'")
+	args = append(args, "; echo \"============================\n[exit status:($?)]\"", "'")
 
 	for _, path := range needRemoveFiles {
 		args = append(args, fmt.Sprintf("&& rm \"%s\"", path))
@@ -213,10 +213,11 @@ func runCmd(cmd string, hide bool, args ...string) error {
 	command.Stderr = os.Stderr
 	if hide {
 		command.Stdout = nil
+		command.Stdin = nil
 	} else {
 		command.Stdout = os.Stdout
+		command.Stdin = os.Stdin
 	}
-	command.Stdin = os.Stdin
 	return command.Run()
 }
 
