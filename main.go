@@ -179,7 +179,7 @@ func (runnable *Runnable) Run(adb, target string, oArgs []string) error {
 	fileTargetPath := "/data/local/tmp/" + filepath.Base(target)
 	args = append(args, "shell",
 		"cd /data/local/tmp/",
-		"&& chmod +x", fileTargetPath,
+		"&& chmod 777", fileTargetPath,
 		"&&",
 		"time",
 		"sh", "-c",
