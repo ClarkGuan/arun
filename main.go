@@ -205,10 +205,14 @@ func (runnable *Runnable) Run(adb, target string, oArgs []string) error {
 		args = append(args, fmt.Sprintf("&& rm \"%s\"", path))
 	}
 
-	return runCmd(adb, false, args...)
+	return runCmd2(runnable.verbose, adb, false, args...)
 }
 
 func runCmd(cmd string, hide bool, args ...string) error {
+	return runCmd2(false, cmd, hide, args...)
+}
+
+func runCmd2(verbose bool, cmd string, hide bool, args ...string) error {
 	command := exec.Command(cmd, args...)
 	command.Stderr = os.Stderr
 	if hide {
@@ -217,6 +221,9 @@ func runCmd(cmd string, hide bool, args ...string) error {
 	} else {
 		command.Stdout = os.Stdout
 		command.Stdin = os.Stdin
+	}
+	if verbose {
+		fmt.Printf("run cmd: %q\n", command)
 	}
 	return command.Run()
 }
